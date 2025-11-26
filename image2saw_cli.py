@@ -10,6 +10,9 @@ from scipy.io import wavfile
 from image2saw_core.image_io import load_image, full_image_tile
 from image2saw_core.engine import EngineConfig, init_engine_state, render_buffer
 
+# Maximum value for 16-bit signed integer audio
+INT16_MAX = 32767
+
 
 def main():
     parser = argparse.ArgumentParser(description="image2saw Audio Generation")
@@ -44,8 +47,8 @@ def main():
     buffer = render_buffer(engine_state)
 
     # Convert to 16-bit integer format for WAV
-    # Scale from [-1, 1] to [-32767, 32767]
-    buffer_int16 = np.clip(buffer * 32767, -32767, 32767).astype(np.int16)
+    # Scale from [-1, 1] to [-INT16_MAX, INT16_MAX]
+    buffer_int16 = np.clip(buffer * INT16_MAX, -INT16_MAX, INT16_MAX).astype(np.int16)
 
     # Save as WAV file
     wavfile.write(args.output, args.sample_rate, buffer_int16)
