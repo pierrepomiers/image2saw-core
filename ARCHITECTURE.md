@@ -1,177 +1,87 @@
-# ARCHITECTURE.md
+## Role of the Scan Path in the Sound
 
-## High-level Architecture Overview
+The scan path is crucial in shaping the output sound by defining how audio data is accessed and processed. Here, we describe three types of scan paths:
 
-The image2saw core v0 pipeline transforms image tiles into loopable audio textures using pixel-based frequency mapping. The flow data is as follows:
-
-```
-image file → image array → tile → scan path → engine → audio buffer → WAV
-```
-
-### ASCII Block Diagram
+### Zigzag
+The zigzag scan path moves diagonally back and forth, allowing for smooth transitions between points.  
 
 ```
-image2saw_cli.py
-        |
-        v
-  image_io.load_image
-        |
-        v
-  image_io.full_image_tile --> scan.build_scan_path
-               |                      |
-               v                      v
-        scan_path             engine.init_engine_state
-                                     |
-                           engine.render_buffer
-                                     |
-                           writes to WAV output
+Zigzag:
+→ → → → ↙ → → → → ↙
 ```
 
-## Module-by-Module Description
-
-### `image_io.py`
-- **Responsibility:** Load and process images, normalize pixel values, handle tile division.
-- **Main Functions:**
-  - `load_image(file_path)`: Loads image via Pillow and converts to NumPy array.
-  - `full_image_tile(image_array)`: Treats the entire image as a single tile.
-- **Consumes:** Image file paths.
-- **Produces:** Numpy arrays of shape `(height, width, channels)`.
-
-### `scan.py`
-- **Responsibility:** Generate and manage scan paths for image traversal.
-- **Main Functions:**
-  - `build_scan_path(tile)`: Creates a raster path (treated as circular).
-- **Consumes:** Image tiles.
-- **Produces:** Arrays of coordinates `[(y0, x0), (y1, x1), ...]`.
-
-### `mapping.py`
-- **Responsibility:** Map pixel values to audio parameters.
-- **Main Functions:**
-  - `pixel_to_scalar_gray(pixel)`: Converts grayscale pixels to scalar values.
-  - `pixel_to_scalar_hsv(pixel)` and `blend_gray_hsv(...)`.
-  - `scalar_to_frequency(value, fmin, fmax)`: Maps normalized scalars to frequencies.
-- **Consumes:** Pixel values.
-- **Produces:** Scalar values or frequencies.
-
-### `engine.py`
-- **Responsibility:** Synthesizes audio from scan paths and pixel mappings.
-- **Main Functions:**
-  - `EngineConfig`: Configuration (number of voices, sample rate, etc.).
-  - `VoiceState`: Holds `phase` and `step` per voice.
-  - `EngineState`: Tracks engine runtime state (scan path + voices).
-  - `render_buffer(state)`: Produces audio buffers via iterative synthesis.
-- **Consumes:** Scan paths, scalar values.
-- **Produces:** Audio buffers (NumPy arrays).
-
-### `image2saw_cli.py`
-- **Responsibility:** Manages the command-line interface.
-- **Main Functions:**
-  - Parses arguments (`argparse`).
-  - Uses other modules to coordinate rendering.
-- **Consumes:** Input arguments, image files.
-- **Produces:** Audio WAV files.
-
----
-
-## Data Structures and Types
-
-### Tile Representation
-- **Shape:** `(height, width, channels)`.
-- **Value Ranges:** Grayscale (`0–255`), HSV (`0–1`).
-
-### Scan Path Array
-- **Shape:** `(N, 2)`.
-- **Coordinates:** `(y, x)` array.
-
-### Engine Data Structures
-```
-EngineState
-├─ config: EngineConfig
-├─ scan_path: [(y0,x0), (y1,x1), ...]
-└─ voices:
-   ├─ VoiceState(phase=..., step=...)
-   ├─ VoiceState(phase=..., step=...)
-   └─ ...
-```
-
----
-
-## Flow of a Typical Render
-
-1. Parse CLI arguments.
-2. Load image.
-3. Build tile (entire image).
-4. Generate scan path.
-5. Initialize engine state.
-6. Render audio buffer via `render_buffer`.
-7. Export as WAV file.
-
-### Sequence Diagram
+### Raster
+In contrast, the raster scan path operates horizontally, line by line:
 
 ```
-image2saw_cli.py          image_io            scan           engine
-       |                    |                  |               |
-       |-- load_image() --> |                  |               |
-       |                    |-- np.ndarray --> |               |
-       |                    |                  |               |
-       |-- full_image_tile()-----------------> |               |
-       |                    |                  |               |
-       |--------------------- build_scan_path() -------------> |
-       |                                                       |
-       |------------------------ init_engine_state() --------> |
-       |                                                       |
-       |------------------------- render_buffer() -----------> |
-       |                                                       |
-       |---------------------------- write_wav() -------------|
+Raster:
+→ → → → -
+← ← ← ← -
 ```
 
----
+### Future Path Types
+We anticipate developing future path types that may combine features of zigzag and raster scans for optimized sound processing.
 
-## Circular Scanning and Loopability
 
-The scan path is treated as circular:
+## Multi-Voice Continuous Scanning
+
+In this system, all voices utilize the same scan path but differ in their phase and step:
+
 ```
-Scan indices:
-   0 → 1 → 2 → ... → N-2 → N-1
-   ^                       |
-   |_______________________|
-
-Voice phase:
-   phase = (phase + step) % N
-```
-
-### `num_cycles`
-Defines total sample output:
-```samples = num_cycles × len(scan_path) × samples_per_step```
-
----
-
-## Grayscale / HSV Mapping and Blend
-
-Mapping flow:
-```
-pixel (R,G,B)
-     |
-     +--> grayscale → gray_scalar
-     |
-     +--> HSV ------→ hsv_scalar
-
-gray_scalar, hsv_scalar
-     |
-     +--> blend_gray_hsv(...) → value [0,1]
-                          |
-                          v
-                   scalar_to_frequency(...)
-                          |
-                          v
-                       frequency (Hz)
+Voice 1 phase: o----------  
+Voice 2 phase: ----o-------  
+Voice 3 phase: --------o---  
 ```
 
----
+This multi-voice approach allows for a richer auditory experience, as different voices contribute varied elements to the overall sound.
 
-## Future Extension Points
+## HSV Mapping Philosophy
 
-- **Tile Selection:** Sub-regions of a larger image.
-- **Additional Scan Patterns:** Spirals or user-defined paths.
-- **Real-time Rendering:** Audio blocks for live playback.
-- **GUI Integration:** Leverage PySide6 for usability.
+HSV mapping plays a significant role in shaping the audio output:
+- **Hue** refers to the frequency selection, affecting tonal changes.
+- **Saturation** controls modulation, influencing vibrancy.
+- **Value** corresponds to amplitude, determining loudness.
+
+Additionally, the blend parameter facilitates smooth transitions between mappings.
+
+## Loopability Section
+
+The system incorporates loopability through:
+- `num_cycles × path_length` ensures endings align correctly for seamless playback.
+
+Examples of engine phases/synchrony:
+```
+Engine Phases:
+| Voice 1 | Voice 2 | Voice 3 |
+|----------|----------|----------|
+| Phase 1 | Phase 1 | Phase 1 |
+| Phase 2 | Phase 2 | Phase 2 |
+```
+
+All voices loop back precisely, maintaining harmony throughout.
+
+## Future PySide6 Integration
+
+Future integration will streamline GUI interactions, particularly concerning:
+- Tile selection methods for better user input  
+- Live real-time rendering blocks to enhance the interface
+- Maintaining `EngineState` for live playback and re-rendering, allowing for dynamic adjustments during operation.
+
+## Distinction Between EngineState and EngineConfig
+
+It is vital to distinguish between static configurations versus evolving runtime states. 
+
+- **EngineState** refers to the current conditions and status during operation.
+- **EngineConfig** is the static setup that remains consistent unless explicitly changed. 
+
+Mapping future GUI connections will be essential for maintaining rendering continuity across different states.
+
+## Optional Render Blocks Sequences
+
+Examples of render block sequences:
+```
+[Block 1] Voice phase = 0.0 → 52.3  
+[Block 2] Voice phase = 52.3 → 104.7  
+[Block 3] Voice phase = 104.7 → 157.1 → wraps → 5.1  
+```
+These optional sequences allow for flexible audio manipulation and creative sound design.
