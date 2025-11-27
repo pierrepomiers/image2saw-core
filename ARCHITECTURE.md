@@ -1,87 +1,178 @@
+---
 ## Role of the Scan Path in the Sound
 
-The scan path is crucial in shaping the output sound by defining how audio data is accessed and processed. Here, we describe three types of scan paths:
+The **scan path** determines the trajectory over an image, directly influencing the generated audio texture. Key considerations are **continuity**, **circularity**, and **loopability**.
 
-### Zigzag
-The zigzag scan path moves diagonally back and forth, allowing for smooth transitions between points.  
+### Scan Path Types
 
-```
-Zigzag:
-→ → → → ↙ → → → → ↙
-```
+1. **Zigzag (Correct Example)**  
+   The zigzag path ensures local pixel continuity, with back-and-forth scanning in rows. This avoids perceptual jumps and promotes smoother frequency variations.
 
-### Raster
-In contrast, the raster scan path operates horizontally, line by line:
+   ```
+   Zigzag (even rows →, odd rows ←):
+   Row 0: → → → → →
+   Row 1: ← ← ← ← ←
+   Row 2: → → → → →
+   Row 3: ← ← ← ← ←
+   ```
 
-```
-Raster:
-→ → → → -
-← ← ← ← -
-```
+2. **Raster (for comparison)**  
+   Raster scanning introduces jumps between rows, creating discontinuities that can result in more abrupt transitions sonically.
 
-### Future Path Types
-We anticipate developing future path types that may combine features of zigzag and raster scans for optimized sound processing.
+   ```
+   Raster:
+   → → → → →  ↓
+   ← ← ← ← ←  ↓
+   → → → → →  ↓
+   ```
 
+   **Key Differences:**
+   - Zigzag maintains continuity across image rows.
+   - Raster introduces stronger discontinuities at row edges.
+
+#### Why Continuity Matters
+- **Preserves Pixel Continuity:** Close pixels map to similar frequencies, avoiding abrupt changes.
+- **Psychoacoustic Benefits:** Smoother transitions lead to more harmonious textures.
+- **Musical Loopability:** Assets created align better with looping aesthetics.
+
+#### Future Scan Path Types
+All future scan paths (e.g., spirals, curves) must retain:
+- **Continuity:** Avoid large perceptual frequency jumps.
+- **Circularity:** Wrap around perfectly.
+- **Loopability:** Fit integer cycles for seamless looping.
+
+---
 
 ## Multi-Voice Continuous Scanning
 
-In this system, all voices utilize the same scan path but differ in their phase and step:
+In multi-voice setups:
+- All voices share the same scan path.
+- Each voice begins with a unique **phase** offset and advances with its own **step**.
 
+#### Phase Evolution Over Time
 ```
-Voice 1 phase: o----------  
-Voice 2 phase: ----o-------  
-Voice 3 phase: --------o---  
+t = 0:
+Voice1: o----------
+Voice2: ----o-------
+Voice3: --------o---
+
+t = 1:
+Voice1: -o---------
+Voice2: -----o------
+Voice3: ---------o--
+
+t = 2:
+Voice1: --o--------
+Voice2: ------o-----
+Voice3: ----------o-
 ```
 
-This multi-voice approach allows for a richer auditory experience, as different voices contribute varied elements to the overall sound.
+#### Why Phase Offsets Matter
+- **Chorus-Like Width:** By spreading voice phases, the output texture becomes richer and more complex.
+- **Thickened Audio Textures:** Independent movement adds dynamic depth.
+
+---
 
 ## HSV Mapping Philosophy
 
-HSV mapping plays a significant role in shaping the audio output:
-- **Hue** refers to the frequency selection, affecting tonal changes.
-- **Saturation** controls modulation, influencing vibrancy.
-- **Value** corresponds to amplitude, determining loudness.
+#### Philosophy of HSV Mapping
 
-Additionally, the blend parameter facilitates smooth transitions between mappings.
+1. **Hue (H):** Maps to **pitch regions** or **octaves**, influencing overall tonal quality.
+2. **Saturation (S):** Controls **vibrato depth**, **detune width**, or **modulation intensity**.
+3. **Value (V):** Modulates **amplitude** levels, connecting brightness to volume or luminance-based timbral shifts.
+
+#### Dataflow with Annotations
+```
+(pixel RGB)
+      |
+      +--> grayscale → gray_scalar  (smooth, luminance-based pitch)
+      |
+      +--> HSV → (H, S, V)
+           |    |     |
+           |    |     +--> Amplitude modulation (V-based)
+           |    +--------> Vibrato depth (from S)
+           +-------------> Pitch region selector (H → frequencies)
+```
+
+#### Role of `blend`
+- `blend=0.0` → Uses pure HSV data.
+- `blend=1.0` → Relies entirely on grayscale.
+- `blend=0.5` → Equal contribution, balancing luminance and color impact.
+
+---
 
 ## Loopability Section
 
-The system incorporates loopability through:
-- `num_cycles × path_length` ensures endings align correctly for seamless playback.
+#### Return-to-Origin Behavior
+For perfect looping:
+1. **Scan Path Cycles:**
+   ```
+   Scan Path Length = N
 
-Examples of engine phases/synchrony:
+   If num_cycles = 2:
+   Cycle 1: 0 → 1 → 2 → … → N-1
+   Cycle 2: 0 → 1 → 2 → … → N-1
+   Result:
+   - First sample == Last sample (numerically identical).
+   ```
+
+2. **Voice Phase Alignment:**
+   ```
+   Voice Phase Progression (mod N):
+   Initial Phases:
+   v1: 0.0
+   v2: 33.3
+   v3: 66.6
+
+   After One Cycle:
+   v1: 0.0
+   v2: 33.3
+   v3: 66.6
+   ```
+
+3. **Cyclic Alignment Diagram:**
+   ```
+   Circular Path:
+   0 → 1 → 2 → … → N-1
+   ^               |
+   |————— Seamless Loop —————|
+   ```
+
+---
+
+## Distinction Between EngineState vs EngineConfig
+
+#### Configuration vs State
 ```
-Engine Phases:
-| Voice 1 | Voice 2 | Voice 3 |
-|----------|----------|----------|
-| Phase 1 | Phase 1 | Phase 1 |
-| Phase 2 | Phase 2 | Phase 2 |
+EngineConfig (Static):
+├─ sample_rate
+├─ fmin, fmax
+├─ mode
+├─ hsv_blend
+├─ num_cycles
+└─ num_voices
+
+EngineState (Dynamic):
+├─ scan_path (fixed at initialization)
+├─ voices:
+│    ├─ VoiceState.phase (evolves per sample)
+│    └─ VoiceState.step  (may become dynamic)
+└─ runtime counters (future block state tracking)
 ```
 
-All voices loop back precisely, maintaining harmony throughout.
+#### Key Distinction:
+- **EngineConfig:** Immutable settings defined at startup.
+- **EngineState:** Evolves during runtime, tracking real-time synthesis behavior.
 
-## Future PySide6 Integration
+---
 
-Future integration will streamline GUI interactions, particularly concerning:
-- Tile selection methods for better user input  
-- Live real-time rendering blocks to enhance the interface
-- Maintaining `EngineState` for live playback and re-rendering, allowing for dynamic adjustments during operation.
+## Why This Architecture Enables Real-Time Rendering
 
-## Distinction Between EngineState and EngineConfig
-
-It is vital to distinguish between static configurations versus evolving runtime states. 
-
-- **EngineState** refers to the current conditions and status during operation.
-- **EngineConfig** is the static setup that remains consistent unless explicitly changed. 
-
-Mapping future GUI connections will be essential for maintaining rendering continuity across different states.
-
-## Optional Render Blocks Sequences
-
-Examples of render block sequences:
-```
-[Block 1] Voice phase = 0.0 → 52.3  
-[Block 2] Voice phase = 52.3 → 104.7  
-[Block 3] Voice phase = 104.7 → 157.1 → wraps → 5.1  
-```
-These optional sequences allow for flexible audio manipulation and creative sound design.
+This modular design supports real-time audio rendering by:
+1. **Block-Based Evolution:**
+   - `render_block()` advances voice phases logically.
+   - All voices remain continuous between blocks.
+2. **Dynamic Tile Selection:**
+   - A live GUI can update `scan_path` dynamically without disrupting voice continuity.
+3. **Flexible Parameter Updates:**
+   - `EngineState` ensures smooth transitions for real-time GUI interaction.
