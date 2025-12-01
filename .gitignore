@@ -1,42 +1,68 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# =========================
+# OS / EDITORS / GENERIC
+# =========================
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VSCode
+.vscode/
+.code-workspace
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.whl
 *.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
 
 # Virtual environments
 venv/
 env/
 ENV/
+.venv/
 
-# IDE files
-.idea/
-.vscode/
-*.swp
-*.swo
+# =========================
+# PROJECT-SPECIFIC
+# =========================
 
-# Test artifacts
-.pytest_cache/
-.coverage
-htmlcov/
+# Do not commit generated audio
+*.wav
+*.mp3
+*.flac
+*.aiff
 
-# Temporary files
+# Do not commit generated video
+*.mp4
+*.mov
+*.avi
+
+# Do not commit input/output image assets
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+*.tiff
+
+# Temporary debug or scratch files
 *.tmp
-*.temp
+*.log
+
+# =========================
+# IDEs
+# =========================
+
+# PyCharm
+.idea/
+*.iml
+
