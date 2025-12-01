@@ -79,7 +79,7 @@ _Planned improvements for seamlessness include: higher resolution scanning, cros
 Ensure the following dependencies are installed:
 
 - **Python**: Version 3.10 or newer
-- **Libraries**: `numpy`, `pillow`, optionally `scipy`
+- **Libraries**: `numpy`, `pillow`
 
 ### Steps
 
@@ -91,7 +91,7 @@ Ensure the following dependencies are installed:
 
 2. Install the required Python packages:
    ```bash
-   pip install numpy pillow scipy
+   pip install numpy pillow
    ```
 
 3. You’re ready!

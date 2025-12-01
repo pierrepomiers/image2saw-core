@@ -4,8 +4,8 @@ image2saw_cli.py: A simple CLI interface for the image2saw core engine.
 """
 
 import argparse
+import wave
 import numpy as np
-from scipy.io import wavfile
 
 from image2saw_core.image_io import load_image, full_image_tile
 from image2saw_core.engine import EngineConfig, init_engine_state, render_buffer
@@ -13,6 +13,22 @@ from image2saw_core.engine import EngineConfig, init_engine_state, render_buffer
 # Maximum value for 16-bit signed integer audio
 INT16_MAX = 32767
 
+def write_wav_mono(path: str, sample_rate: int, data: np.ndarray) -> None:
+    """
+    Write a mono float32 buffer in [-1,1] to a 16-bit PCM WAV file.
+    """
+    # Clamp
+    data = np.clip(data, -1.0, 1.0)
+
+    # Convert to int16
+    int_data = (data * 32767.0).astype(np.int16)
+
+    # Write using Python's standard library
+    with wave.open(path, 'wb') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)  # 16-bit
+        w.setframerate(sample_rate)
+        w.writeframes(int_data.tobytes())
 
 def main():
     parser = argparse.ArgumentParser(description="image2saw Audio Generation")
@@ -46,12 +62,9 @@ def main():
     # Render audio buffer
     buffer = render_buffer(engine_state)
 
-    # Convert to 16-bit integer format for WAV
-    # Scale from [-1, 1] to [-INT16_MAX, INT16_MAX]
-    buffer_int16 = np.clip(buffer * INT16_MAX, -INT16_MAX, INT16_MAX).astype(np.int16)
-
     # Save as WAV file
-    wavfile.write(args.output, args.sample_rate, buffer_int16)
+    write_wav_mono(args.output, config.sample_rate, buffer)
+    # wavfile.write(args.output, args.sample_rate, buffer_int16)
     print(f"Audio saved to {args.output}")
 
 
